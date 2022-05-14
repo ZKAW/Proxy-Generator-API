@@ -1,6 +1,27 @@
 [
     {
         "url":"https://free-proxy-list.net/",
-        "methods":["https"]
+        "methods":["https"],
+        "content_type":"table"
+    },
+    {
+        "url":"https://www.proxy-list.download/api/v1/get?type=https",
+        "methods":["https"],
+        "content_type":"raw"
+    },
+    {
+        "url":"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "methods":["https"],
+        "content_type":"raw"
+    },
+    {
+        "url":"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+        "methods":["https"],
+        "content_type":"raw"
+    },
+    {
+        "url":"https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-https.txt",
+        "methods":["https"],
+        "content_type":"raw"
     }
 ]
