@@ -24,14 +24,22 @@ def load_conf():
         conf = json.load(json_data)
     return conf
 
+def load_proxy_providers():
+    with open("proxy_providers.json", 'r') as json_data:
+        providers = json.load(json_data)
+    return providers
+
+conf = load_conf()
+proxy_providers = load_proxy_providers()
 
 class ProxyGenerator:
-    def __init__(self, length=10, max_ms=500, timeout=1, check_google=True, url="https://free-proxy-list.net/"):
+    def __init__(self, length=10, max_ms=500, timeout=1, check_google=True, url="https://free-proxy-list.net/", methods=["https"]):
         self.length = length
         self.max_ms = max_ms
         self.timeout = timeout
         self.check_google = check_google
         self.url = url
+        self.methods = methods
         self.proxy_list = []
 
     def generate_list(self):
@@ -78,7 +86,32 @@ class ProxyGenerator:
                     try:
                         proxy = p_format(*proxy_data_temp)
 
-                        response = requests.request(request_method, visit_url, proxies={'https':f"{proxy['ip_address']}:{proxy['port']}"}, timeout=self.timeout)
+                        response = False
+                        for method in self.methods:
+                            try:
+                                method = method.lower()
+                                response = requests.request(request_method, visit_url, proxies={method:f"{proxy['ip_address']}:{proxy['port']}"}, timeout=self.timeout)
+                                proxy['method'] = method
+                                break
+                            except requests.exceptions.ProxyError:
+                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Proxy Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                                print(status, end='\r')
+                                continue
+                            except requests.exceptions.Timeout:
+                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Timeout) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                                print(status, end='\r')
+                                continue
+                            except requests.exceptions.ConnectionError:
+                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Connection Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                                print(status, end='\r')
+                                continue
+                            except:
+                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Unknown Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                                print(status, end='\r')
+                                continue
+
+                        if not response: continue
+                        if response.status_code != 200: continue
 
                         ms = int(response.elapsed.total_seconds()*100)
                         ms = round(ms, 2)
@@ -99,8 +132,8 @@ class ProxyGenerator:
                                 "country": proxy['country'],
                                 "anonymity": proxy['anonymity'],
                                 "check_google": conf['check_google'],
-                                "https": proxy['https'],
-                                "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "method": proxy['method'],
+                                "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 "ms": proxy['ms']
                             }
                             self.proxy_list.append(proxy_item)
@@ -113,19 +146,6 @@ class ProxyGenerator:
                             exit()
                         else:
                             break
-      
-                    except requests.exceptions.ProxyError:
-                        status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Proxy Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                        print(status, end='\r')
-                        continue
-                    except requests.exceptions.Timeout:
-                        status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Timeout) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                        print(status, end='\r')
-                        continue
-                    except requests.exceptions.ConnectionError:
-                        status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Connection Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                        print(status, end='\r')
-                        continue
                     except:
                         status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Unknown Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                         print(status, end='\r')
@@ -148,30 +168,28 @@ class ProxyGenerator:
     def get_proxy_amount(self):
         return len(self.proxy_list)
 
-conf = load_conf()
 
-def main(proxy_list = []):
-
-    free_proxy = ProxyGenerator(length=conf['length'] - len(proxy_list), # substract old proxies from length
-                max_ms=conf['max_ms'],
-                timeout=conf['timeout'],
-                check_google=conf['check_google'],
-                url="https://free-proxy-list.net/"
-            )
-
-    free_proxy.generate_list()
-    proxy_list += free_proxy.get_proxy_list() # add generated proxies to proxy_list
-
-    if (len(free_proxy.get_proxy_list()) < conf['length']): # if we don't have enough proxies
-        print(f'\nNot enough proxies, trying to get more from sslproxies.org...')
-        ssl_proxy = ProxyGenerator(length=conf['length'] - len(free_proxy.get_proxy_list()), # substract free_proxy proxies from length
+def generate_proxies(url, methods, amount):
+    proxy_list = ProxyGenerator(amount,
             max_ms=conf['max_ms'],
             timeout=conf['timeout'],
             check_google=conf['check_google'],
-            url="https://sslproxies.org/"
+            url=url,
+            methods=methods
         )
-        ssl_proxy.generate_list() # generate more
-        proxy_list += ssl_proxy.get_proxy_list() # add generated proxies to proxy_list
+    proxy_list.generate_list() # start generating proxies
+    return proxy_list.get_proxy_list() # return generated proxies
+
+def main(proxy_list = []):
+    if len(proxy_list) >= conf['length']: return proxy_list
+
+    # Generate proxies from proxy providers
+    for provider in proxy_providers:
+        if len(proxy_list) >= conf['length']: break
+        print(f"\nGetting proxies from {provider['url']}...")
+
+        # Add generated proxies to proxy_list
+        proxy_list += generate_proxies(provider['url'], provider['methods'], conf['length'] - len(proxy_list))
 
     return proxy_list
 

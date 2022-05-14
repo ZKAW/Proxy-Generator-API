@@ -17,7 +17,6 @@ app = FastAPI()
 # Define working directory
 workspace = os.path.dirname(os.path.realpath(__file__))
 
-
 conf = generator.load_conf()
 
 def check_proxy_list(proxy_list):
@@ -30,7 +29,7 @@ def check_proxy_list(proxy_list):
 
     for proxy in proxy_list:
         try:
-            response = requests.request('get', visit_url, proxies={'https':f"{proxy['ip_address']}:{proxy['port']}"}, timeout=conf['timeout'])
+            response = requests.request('get', visit_url, proxies={proxy['method']:f"{proxy['ip_address']}:{proxy['port']}"}, timeout=conf['timeout'])
         except:
             new_proxy_list.remove(proxy)
             continue
@@ -81,19 +80,38 @@ class ProxyThreading(object):
             except: pass
 
         return proxy_list
+    
+    def delete_proxy_list(self):
+        output_dir = os.path.join(workspace, 'output')
+        if not os.path.exists(output_dir): return
+
+        output_path = os.path.join(output_dir, 'proxy_list.json')
+        if not os.path.exists(output_path): return
+
+        os.remove(output_path)
+        self.proxy_list = []
+
+        return True
 
     def run(self):
         """ Method that runs forever """
+        
+        if (len(self.proxy_list) > 0): print(f"Proxy list loaded: {len(self.proxy_list)} proxies")
+
         while True:
             # Remove dead proxies
             new_proxy_list = check_proxy_list(self.proxy_list)
 
-            # Add old working proxies to new list
-            if (len(new_proxy_list) > 0):
+            if (len(new_proxy_list) >= conf['length']): # already have enough proxies
+                print(f"\nProxy list is full, {len(new_proxy_list)}/{conf['length']} proxies")
+            elif (len(new_proxy_list) > 0): # Add old working proxies to new list
                 print(f'\nFound {len(new_proxy_list)} old working proxies, reusing them...')
                 self.proxy_list = generator.main(new_proxy_list) 
             else:
                 self.proxy_list = generator.main()
+
+            # Save proxy list for next session
+            if (self.read_proxy_file() != self.proxy_list): self.save_proxy_list()
 
             print("Waiting {} seconds before next generation...".format(self.interval))
             time.sleep(self.interval)
@@ -111,6 +129,11 @@ def api_status():
 @app.get('/proxy/get_proxy_list')
 def get_proxy_list():
    return proxyList.get_proxy_list()
+
+@app.get('/proxy/delete_proxy_list')
+def delete_proxy_list():
+    proxyList.delete_proxy_list()
+    return { 'status': 'success' }
 
 def run_api():
     asyncio.set_event_loop(asyncio.new_event_loop())
