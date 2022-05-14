@@ -38,15 +38,15 @@ class ProxyThreading(object):
         thread.daemon = True                            # Daemonize thread
         thread.start()                                  # Start the execution
 
-    def check_proxy_list(self):
+    def remove_dead_proxy(self):
         if (len(self.proxy_list) == 0): return []
 
         if conf['check_google']: visit_url = 'https://google.com/'
         else: visit_url = 'https://icanhazip.com/'
 
-        new_proxy_list = self.proxy_list.copy()
+        old_proxy_list = self.proxy_list.copy()
 
-        for proxy in new_proxy_list:
+        for proxy in old_proxy_list:
             try:
                 # Check if proxy is working
                 proxy_handler = urllib.request.ProxyHandler({proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"})        
@@ -60,17 +60,19 @@ class ProxyThreading(object):
                 ms = round(ms, 2)
 
                 # If response time is too slow, remove proxy
-                if (ms > conf['timeout']):
-                    new_proxy_list.remove(proxy)
+                if (ms > conf['max_ms']):
+                    # print(f"Removing {proxy['ip_address']}:{proxy['port']} from proxy list, response time is {ms}ms")
+                    self.proxy_list.remove(proxy)
                     continue
 
-                new_proxy_list[new_proxy_list.index(proxy)]['ms'] = ms
+                self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
 
             except:
-                new_proxy_list.remove(proxy)
+                # print('\nProxy {} is dead, removing...'.format(proxy['ip_address']))
+                self.proxy_list.remove(proxy)
                 continue
         
-        return new_proxy_list
+        return self.proxy_list
 
     def save_proxy_list(self):
         output_dir = os.path.join(workspace, 'output')
@@ -113,18 +115,18 @@ class ProxyThreading(object):
     def run(self):
         """ Method that runs forever """
         
-        if (len(self.proxy_list) > 0): print(f"Proxy list loaded: {len(self.proxy_list)} proxies")
-        
+        self.remove_dead_proxy()
+        if (len(self.proxy_list) > 0): print(f"Proxy list loaded: {len(self.proxy_list)} working proxies")
 
         while True:
             # Remove dead proxies
-            new_proxy_list = self.check_proxy_list()
+            self.remove_dead_proxy()
 
-            if (len(new_proxy_list) >= conf['length']): # already have enough proxies
-                print(f"\nProxy list is full, {len(new_proxy_list)}/{conf['length']} proxies")
-            elif (len(new_proxy_list) > 0): # Add old working proxies to new list
-                print(f'\nFound {len(new_proxy_list)} old working proxies, reusing them...')
-                self.proxy_list = generator.main(new_proxy_list) 
+            if (len(self.proxy_list) >= conf['length']): # already have enough proxies
+                print(f"\nProxy list is full, {len(self.proxy_list)}/{conf['length']} proxies")
+            elif (len(self.proxy_list) > 0): # Add old working proxies to new list
+                print(f'\nFound {len(self.proxy_list)} old working proxies, reusing them...')
+                self.proxy_list = generator.main(self.proxy_list) 
             else:
                 self.proxy_list = generator.main()
 
