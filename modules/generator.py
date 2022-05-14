@@ -119,7 +119,7 @@ class ProxyGenerator:
 
                         ms = check[1]
                         if ms > self.max_ms:
-                            status = f"{proxy['ip_address']}:{proxy['port']} -> Failed ({ms}ms but max is {self.max_ms}ms) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                            status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed ({ms}ms but max is {self.max_ms}ms) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                             print(status, end='\r')
                             continue
                         else:
@@ -139,7 +139,7 @@ class ProxyGenerator:
                                 "ms": proxy['ms']
                             }
                             self.proxy_list.append(proxy_item)
-                            status = f"{proxy['ip_address']}:{proxy['port']} ({ms}ms) -> Success - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                            status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) ({ms}ms) -> Success - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                             print(status, end='\n')
 
                     except KeyboardInterrupt:
