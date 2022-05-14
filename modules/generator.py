@@ -138,7 +138,8 @@ class ProxyGenerator:
                                 "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 "ms": proxy['ms']
                             }
-                            self.proxy_list.append(proxy_item)
+
+                            if (proxy_item not in self.proxy_list): self.proxy_list.append(proxy_item)
                             status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) ({ms}ms) -> Success - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                             print(status, end='\n')
 
