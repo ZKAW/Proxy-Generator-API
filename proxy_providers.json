@@ -1,9 +1,5 @@
 [
     {
-        "url":"https://www.socks-proxy.net/",
-        "methods":["socks4","socks5"]
-    },
-    {
         "url":"https://sslproxies.org/",
         "methods":["https"]
     },
@@ -14,5 +10,9 @@
     {
         "url":"https://www.us-proxy.org/",
         "methods":["https"]
+    },
+    {
+        "url":"https://www.socks-proxy.net/",
+        "methods":["socks4","socks5"]
     }
 ]

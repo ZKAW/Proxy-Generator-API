@@ -1,6 +1,7 @@
 import json
 import requests
 import datetime
+import urllib.request
 
 from bs4 import BeautifulSoup as bs
 
@@ -41,6 +42,25 @@ class ProxyGenerator:
         self.url = url
         self.methods = methods
         self.proxy_list = []
+    
+    def check_proxy(self, proxy):
+        if self.check_google: visit_url = 'https://google.com/'
+        else: visit_url = 'https://icanhazip.com/'
+
+        try:
+            proxy_handler = urllib.request.ProxyHandler({proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"})        
+            opener = urllib.request.build_opener(proxy_handler)
+            opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+            urllib.request.install_opener(opener)
+            req = urllib.request.Request(visit_url)
+            sock=urllib.request.urlopen(req, timeout=self.timeout)
+            response = requests.get(visit_url, proxies={proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"}, timeout=self.timeout)
+            ms = int(response.elapsed.total_seconds()*100)
+            ms = round(ms, 2)
+
+            return (True, ms)
+        except:
+            return (False, None)
 
     def generate_list(self):
         """
@@ -48,23 +68,18 @@ class ProxyGenerator:
         in case of failure.
         """
 
-        # url to check connection using proxy
-        if self.check_google: visit_url = 'https://google.com/'
-        else: visit_url = 'https://icanhazip.com/' 
-
         NUMBER_OF_ATTRIBUTES = 8
-        request_method = 'get'
 
         try:
             # getting html content of site..
-            page = requests.get(self.url)
+            page = requests.get(self.url, timeout=2)
         except:
             # returns empty [] if unable to get source code of site
-            print("\nFailed to get Proxy List :( \nTry Running the script again..")
+            print("\nFailed to get proxy list from provider: " + self.url)
             return []
 
         if page.status_code != 200:
-            print("\nSomething went wrong while getting proxy list!\n")
+            print("\nAn error occured while getting proxy list from provider: " + self.url)
             return []
 
         soup = bs(page.text, 'html.parser')  # creating soup object
@@ -86,36 +101,23 @@ class ProxyGenerator:
                     try:
                         proxy = p_format(*proxy_data_temp)
 
-                        response = False
+                        check = (False, None)
                         for method in self.methods:
                             try:
-                                method = method.lower()
-                                response = requests.request(request_method, visit_url, proxies={method:f"{proxy['ip_address']}:{proxy['port']}"}, timeout=self.timeout)
-                                proxy['method'] = method
-                                break
-                            except requests.exceptions.ProxyError:
-                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Proxy Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                                print(status, end='\r')
-                                continue
-                            except requests.exceptions.Timeout:
-                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Timeout) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                                print(status, end='\r')
-                                continue
-                            except requests.exceptions.ConnectionError:
-                                status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Connection Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                                print(status, end='\r')
-                                continue
+                                proxy['method'] = method.lower()
+                                check = self.check_proxy(proxy)
+                                if (check[0] and check[1] != None): break
                             except:
                                 status = f"{proxy['ip_address']}:{proxy['port']} ({method}) -> Failed (Unknown Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                                 print(status, end='\r')
                                 continue
 
-                        if not response: continue
-                        if response.status_code != 200: continue
+                        if not check[0] or check[1] == None:
+                            status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                            print(status, end='\r')
+                            continue
 
-                        ms = int(response.elapsed.total_seconds()*100)
-                        ms = round(ms, 2)
-
+                        ms = check[1]
                         if ms > self.max_ms:
                             status = f"{proxy['ip_address']}:{proxy['port']} -> Failed ({ms}ms but max is {self.max_ms}ms) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                             print(status, end='\r')
@@ -131,7 +133,7 @@ class ProxyGenerator:
                                 "code": proxy['code'],
                                 "country": proxy['country'],
                                 "anonymity": proxy['anonymity'],
-                                "check_google": conf['check_google'],
+                                "check_google": self.check_google,
                                 "method": proxy['method'],
                                 "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 "ms": proxy['ms']

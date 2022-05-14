@@ -1,8 +1,9 @@
 import os
 import time
 import threading
-import json
+import urllib
 import requests
+import json
 import uvicorn
 import asyncio
 
@@ -18,23 +19,6 @@ app = FastAPI()
 workspace = os.path.dirname(os.path.realpath(__file__))
 
 conf = generator.load_conf()
-
-def check_proxy_list(proxy_list):
-    if len(proxy_list) == 0: return []
-
-    if conf['check_google']: visit_url = 'https://google.com/'
-    else: visit_url = 'https://icanhazip.com/'
-
-    new_proxy_list = proxy_list.copy()
-
-    for proxy in proxy_list:
-        try:
-            response = requests.request('get', visit_url, proxies={proxy['method']:f"{proxy['ip_address']}:{proxy['port']}"}, timeout=conf['timeout'])
-        except:
-            new_proxy_list.remove(proxy)
-            continue
-    
-    return new_proxy_list
         
 
 class ProxyThreading(object):
@@ -54,6 +38,40 @@ class ProxyThreading(object):
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True                            # Daemonize thread
         thread.start()                                  # Start the execution
+
+    def check_proxy_list(self):
+        if (len(self.proxy_list) == 0): return []
+
+        if conf['check_google']: visit_url = 'https://google.com/'
+        else: visit_url = 'https://icanhazip.com/'
+
+        new_proxy_list = self.proxy_list.copy()
+
+        for proxy in new_proxy_list:
+            try:
+                # Check if proxy is working
+                proxy_handler = urllib.request.ProxyHandler({proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"})        
+                opener = urllib.request.build_opener(proxy_handler)
+                opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+                urllib.request.install_opener(opener)
+                req = urllib.request.Request(visit_url)
+                sock=urllib.request.urlopen(req, timeout=conf['timeout'])
+                response = requests.get(visit_url, proxies={proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"}, timeout=conf['timeout'])
+                ms = int(response.elapsed.total_seconds()*100)
+                ms = round(ms, 2)
+
+                # If response time is too slow, remove proxy
+                if (ms > conf['timeout']):
+                    new_proxy_list.remove(proxy)
+                    continue
+
+                new_proxy_list[new_proxy_list.index(proxy)]['ms'] = ms
+
+            except:
+                new_proxy_list.remove(proxy)
+                continue
+        
+        return new_proxy_list
 
     def save_proxy_list(self):
         output_dir = os.path.join(workspace, 'output')
@@ -97,10 +115,11 @@ class ProxyThreading(object):
         """ Method that runs forever """
         
         if (len(self.proxy_list) > 0): print(f"Proxy list loaded: {len(self.proxy_list)} proxies")
+        
 
         while True:
             # Remove dead proxies
-            new_proxy_list = check_proxy_list(self.proxy_list)
+            new_proxy_list = self.check_proxy_list()
 
             if (len(new_proxy_list) >= conf['length']): # already have enough proxies
                 print(f"\nProxy list is full, {len(new_proxy_list)}/{conf['length']} proxies")
