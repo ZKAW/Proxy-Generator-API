@@ -1,10 +1,15 @@
+import os
 import json
 import requests
 import datetime
 import urllib.request
 
+from pathlib import Path
 from bs4 import BeautifulSoup as bs
 
+# Define working directory
+workspace = os.path.dirname(os.path.realpath(__file__))
+workspace = str(Path(workspace).parent)
 
 def p_format(*args):
     ip_address, port, code, country, anonymity, google, https, last_checked = args
@@ -21,12 +26,12 @@ def p_format(*args):
     }
 
 def load_conf():
-    with open("conf.json", 'r') as json_data:
+    with open(os.path.join(workspace,"conf.json"), 'r') as json_data:
         conf = json.load(json_data)
     return conf
 
 def load_proxy_providers():
-    with open("proxy_providers.json", 'r') as json_data:
+    with open(os.path.join(workspace,"proxy_providers.json"), 'r') as json_data:
         providers = json.load(json_data)
     return providers
 

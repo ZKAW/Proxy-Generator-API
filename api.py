@@ -8,7 +8,6 @@ import uvicorn
 import asyncio
 
 from fastapi import FastAPI
-from pprint import pprint
 from modules import generator
 
 # Define API
