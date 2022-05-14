@@ -309,9 +309,9 @@ def main(proxy_list = []):
         print(f"\nGetting proxies from {provider['url']}...")
 
         if provider['content_type'].lower() == "table":
-            proxies = generate_proxies_table(provider['url'], provider['methods'], conf['length'])
+            proxies = generate_proxies_table(provider['url'], provider['methods'], conf['length'] - len(proxy_list))
         elif provider['content_type'].lower() == "raw":
-            proxies = generate_proxies_raw(provider['url'], provider['methods'], conf['length'])
+            proxies = generate_proxies_raw(provider['url'], provider['methods'], conf['length'] - len(proxy_list))
         else:
             print("\nUnknown content type: " + provider['content_type'])
             continue
