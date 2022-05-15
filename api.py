@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+import datetime
 import urllib
 import requests
 import json
@@ -18,7 +19,8 @@ app = FastAPI()
 workspace = os.path.dirname(os.path.realpath(__file__))
 
 conf = generator.load_conf()
-        
+
+# TODO: check for duplicates
 
 class ProxyThreading(object):
     """ Threading example class
@@ -65,7 +67,9 @@ class ProxyThreading(object):
                     self.proxy_list.remove(proxy)
                     continue
 
+                # Upgrade proxy values
                 self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
+                self.proxy_list[self.proxy_list.index(proxy)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             except:
                 # print('\nProxy {} is dead, removing...'.format(proxy['ip_address']))
@@ -164,4 +168,5 @@ def run_api():
         loop="asyncio"
     )
 
-run_api()
+if __name__ == '__main__':
+    run_api()

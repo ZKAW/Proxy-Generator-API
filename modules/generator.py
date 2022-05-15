@@ -142,7 +142,7 @@ class ProxyGenerator:
                             "anonymity": proxy['anonymity'],
                             "check_google": self.check_google,
                             "method": proxy['method'],
-                            "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "last_check": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "ms": proxy['ms']
                         }
 
@@ -251,7 +251,7 @@ class RawProxyGenerator:
                     "anonymity": 'unknown',
                     "check_google": self.check_google,
                     "method": proxy['method'],
-                    "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "last_check": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "ms": proxy['ms']
                 }
 
@@ -320,8 +320,3 @@ def main(proxy_list = []):
         proxy_list += proxies
 
     return proxy_list
-
-if __name__ == '__main__':
-    print('\nStarting...\n')
-    print(main())
-    print("\nFinished generating proxy list.\n")
