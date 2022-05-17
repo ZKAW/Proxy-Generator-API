@@ -106,7 +106,6 @@ class ProxyGenerator:
                     # after all attributes have been retrieved
                     # from a row, it's time to format it properly.
                     try:
-                        print('ptemp: ', proxy_data_temp)
                         proxy = p_format(*proxy_data_temp)
 
                         check = (False, None)
