@@ -1,6 +1,6 @@
 {
     "length": 10,
-    "max_ms": 150,
-    "timeout": 0.3,
+    "max_ms": 500,
+    "timeout": 0.75,
     "check_google": true
 }

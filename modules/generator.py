@@ -106,6 +106,7 @@ class ProxyGenerator:
                     # after all attributes have been retrieved
                     # from a row, it's time to format it properly.
                     try:
+                        print('ptemp: ', proxy_data_temp)
                         proxy = p_format(*proxy_data_temp)
 
                         check = (False, None)
@@ -246,9 +247,9 @@ class RawProxyGenerator:
                 proxy_item = {
                     "ip_address": proxy['ip_address'],
                     "port": int(proxy['port']),
-                    "code": 'unknown',
-                    "country": 'unknown',
-                    "anonymity": 'unknown',
+                    "code": None,
+                    "country": None,
+                    "anonymity": None,
                     "check_google": self.check_google,
                     "method": proxy['method'],
                     "last_check": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
