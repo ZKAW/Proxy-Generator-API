@@ -5,27 +5,17 @@
         "content_type":"table"
     },
     {
-        "url":"https://proxyelite.info/api/getproxy/?format=txt&type=http_ip&login=mix101ADWGDDA&password=QtDOvBgb",
+        "url":"https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies_anonymous/http.txt",
         "methods":["https"],
         "content_type":"raw"
     },
     {
-        "url":"https://www.proxy-list.download/api/v1/get?type=https",
+        "url":"https://www.proxy-list.download/api/v1/get?type=https&anon=elite",
         "methods":["https"],
         "content_type":"raw"
     },
     {
-        "url":"https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
-        "methods":["https"],
-        "content_type":"raw"
-    },
-    {
-        "url":"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
-        "methods":["https"],
-        "content_type":"raw"
-    },
-    {
-        "url":"https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-https.txt",
+        "url":"https://www.proxy-list.download/api/v1/get?type=https&anon=anonymous",
         "methods":["https"],
         "content_type":"raw"
     }

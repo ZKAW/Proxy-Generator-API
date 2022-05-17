@@ -103,7 +103,7 @@ class ProxyThreading(object):
             except: pass
 
         return proxy_list
-    
+
     def delete_proxy_list(self):
         output_dir = os.path.join(workspace, 'output')
         if not os.path.exists(output_dir): return
