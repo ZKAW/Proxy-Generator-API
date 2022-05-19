@@ -186,8 +186,7 @@ class ProxyThreading(object):
     def get_proxy_amount(self):
         return len(self.proxy_list)
 
-
-proxyList = ProxyThreading(interval=120)
+proxyList = ProxyThreading(interval=config['interval'])
 
 @app.get('/')
 def help_page():
