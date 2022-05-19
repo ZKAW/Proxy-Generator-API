@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 
 from helpers import config
 from helpers import checker
-from workers import generator_v2 as generator
+from workers import generator
 
 # Define API
 API_HOST,API_PORT='0.0.0.0',5000
