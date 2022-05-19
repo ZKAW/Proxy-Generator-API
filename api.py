@@ -2,14 +2,16 @@ import os
 import time
 import threading
 import datetime
-import urllib
-import requests
 import json
 import uvicorn
 import asyncio
 
 from fastapi import FastAPI
-from modules import generator
+from fastapi.responses import HTMLResponse
+
+from helpers import config
+from helpers import checker
+from workers import generator_v2 as generator
 
 # Define API
 API_HOST,API_PORT='0.0.0.0',5000
@@ -18,9 +20,8 @@ app = FastAPI()
 # Define working directory
 workspace = os.path.dirname(os.path.realpath(__file__))
 
-conf = generator.load_conf()
-
-# TODO: check for duplicates
+# Load config
+config = config.load_config()
 
 class ProxyThreading(object):
     """ Threading example class
@@ -41,42 +42,77 @@ class ProxyThreading(object):
         thread.start()                                  # Start the execution
 
     def remove_dead_proxy(self):
-        if (len(self.proxy_list) == 0): return []
-
-        if conf['check_google']: visit_url = 'https://google.com/'
-        else: visit_url = 'https://icanhazip.com/'
+        if (self.get_proxy_amount() == 0): return []
 
         old_proxy_list = self.proxy_list.copy()
 
         for proxy in old_proxy_list:
-            try:
-                # Check if proxy is working
-                proxy_handler = urllib.request.ProxyHandler({proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"})        
-                opener = urllib.request.build_opener(proxy_handler)
-                opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-                urllib.request.install_opener(opener)
-                req = urllib.request.Request(visit_url)
-                sock=urllib.request.urlopen(req, timeout=conf['timeout'])
-                response = requests.get(visit_url, proxies={proxy['method']: f"{proxy['ip_address']}:{proxy['port']}"}, timeout=conf['timeout'])
-                ms = int(response.elapsed.total_seconds()*100)
-                ms = round(ms, 2)
-
-                # If response time is too slow, remove proxy
-                if (ms > conf['max_ms']):
-                    # print(f"Removing {proxy['ip_address']}:{proxy['port']} from proxy list, response time is {ms}ms")
-                    self.proxy_list.remove(proxy)
-                    continue
-
-                # Upgrade proxy values
-                self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
-                self.proxy_list[self.proxy_list.index(proxy)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            except:
-                # print('\nProxy {} is dead, removing...'.format(proxy['ip_address']))
+            # Check if proxy is working
+            check = checker.check_proxy(proxy, timeout=config['timeout'], check_google=config['check_google'])
+            if (not check[0]):
                 self.proxy_list.remove(proxy)
                 continue
+
+            ms = check[1]
+            # If response time is too slow, remove proxy
+            if (ms > config['max_ms']):
+                # print(f"Removing {proxy['ip_address']}:{proxy['port']} from proxy list, response time is {ms}ms")
+                self.proxy_list.remove(proxy)
+                continue
+
+            # Upgrade proxy values
+            self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
+            self.proxy_list[self.proxy_list.index(proxy)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.proxy_list[self.proxy_list.index(proxy)]['check_google'] = config['check_google']
+
         
         return self.proxy_list
+    
+    def check_proxy_list(self, unchecked_proxy_list):
+        if len(unchecked_proxy_list) == 0: return []
+        new_proxies_counter = 0
+
+        for proxy in unchecked_proxy_list:
+            # Check if proxy is working
+            check = checker.check_proxy(proxy, timeout=config['timeout'], check_google=config['check_google'])
+            if (not check[0]): 
+                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                print(status, end='\r')
+                continue
+
+            ms = check[1]
+            # Check if response time is too slow
+            if (ms > config['max_ms']): 
+                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed (had {ms}ms but max is {self.max_ms}ms) - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                print(status, end='\r')
+                continue
+
+            # Check if proxy is already in proxy list
+            if (checker.check_duplicate(self.proxy_list, proxy)):
+                # Update proxy data if proxy is already in list
+                self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
+                self.proxy_list[self.proxy_list.index(proxy)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self.proxy_list[self.proxy_list.index(proxy)]['check_google'] = config['check_google']
+                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Updated - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                print(status, end='\n')
+                continue
+
+            # Update proxy values
+            proxy['ms'] = ms
+            proxy['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            proxy['check_google'] = config['check_google']
+            
+            # Add new proxy to proxy list
+            self.proxy_list.append(proxy)
+            status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Added - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+            print(status, end='\n')
+            new_proxies_counter += 1
+
+            # We have enough proxies
+            if (self.get_proxy_amount() >= config['max_proxy']): break
+
+        return (self.proxy_list, new_proxies_counter)
+
 
     def save_proxy_list(self):
         output_dir = os.path.join(workspace, 'output')
@@ -120,19 +156,23 @@ class ProxyThreading(object):
         """ Method that runs forever """
         
         self.remove_dead_proxy()
-        if (len(self.proxy_list) > 0): print(f"Proxy list loaded: {len(self.proxy_list)} working proxies")
+        if (self.get_proxy_amount() > 0): print(f"Proxy list loaded: {self.get_proxy_amount()} working proxies found")
 
         while True:
             # Remove dead proxies
             self.remove_dead_proxy()
 
-            if (len(self.proxy_list) >= conf['length']): # already have enough proxies
-                print(f"\nProxy list is full, {len(self.proxy_list)}/{conf['length']} proxies")
-            elif (len(self.proxy_list) > 0): # Add old working proxies to new list
-                print(f'\nFound {len(self.proxy_list)} old working proxies, reusing them...')
-                self.proxy_list = generator.main(self.proxy_list) 
+            if (self.get_proxy_amount() >= config['amount']): # already have enough proxies
+                print(f"\nProxy list is full, {self.get_proxy_amount()}/{config['amount']} proxies")
             else:
-                self.proxy_list = generator.main()
+                unchecked_proxy_list = generator.main()
+                unchecked_proxy_list = self.proxy_list + unchecked_proxy_list
+
+                print(f"-> {len(unchecked_proxy_list)} proxies to check\n")
+                new_proxies_counter = self.check_proxy_list(unchecked_proxy_list)[1]
+
+                print(f"Found {new_proxies_counter} new working proxies")
+                print(f"Currently have {self.get_proxy_amount()}/{config['amount']} working proxies\n")
 
             # Save proxy list for next session
             if (self.read_proxy_file() != self.proxy_list): self.save_proxy_list()
@@ -142,19 +182,39 @@ class ProxyThreading(object):
     
     def get_proxy_list(self):
         return self.proxy_list
+    
+    def get_proxy_amount(self):
+        return len(self.proxy_list)
 
 
 proxyList = ProxyThreading(interval=120)
 
-@app.get('/proxy')
+@app.get('/')
+def help_page():
+    html_content = """
+    <h1>Proxy Checker</h1>
+    <p>
+        <a href="/api/proxy_list" target="_blank">/api/proxy_list</a> - Get proxy list<br>
+        <a href="/api/proxy_amount" target="_blank">/api/proxy_amount</a> - Get proxy amount<br>
+        <a href="/api/proxy_delete" target="_blank">/api/proxy_delete</a> - Delete proxy list<br>
+    </p>
+    """
+
+    return HTMLResponse(content=html_content, status_code=200)
+
+@app.get('/api')
 def api_status():
     return { 'online': True }
 
-@app.get('/proxy/get_proxy_list')
+@app.get('/api/proxy_list')
 def get_proxy_list():
    return proxyList.get_proxy_list()
 
-@app.get('/proxy/delete_proxy_list')
+@app.get('/api/proxy_amount')
+def get_proxy_amount():
+    return proxyList.get_proxy_amount()
+
+@app.get('/api/proxy_delete')
 def delete_proxy_list():
     proxyList.delete_proxy_list()
     return { 'status': 'success' }

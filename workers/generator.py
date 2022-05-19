@@ -59,7 +59,7 @@ def check_proxy(proxy, timeout=1, check_google=True):
         return (False, None)
 
 # Generate proxy from table data (<tr> HTML tags)
-class ProxyGenerator:
+class TabProxyGetter:
     def __init__(self, length=10, max_ms=500, timeout=1, check_google=True, url="https://free-proxy-list.net/", methods=["https"]):
         self.length = length
         self.max_ms = max_ms
@@ -157,7 +157,7 @@ class ProxyGenerator:
                         else:
                             break
                     except:
-                        status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Unknown Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                        status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Unknown Error - Main) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
                         print(status, end='\r')
                         continue
 
@@ -176,7 +176,7 @@ class ProxyGenerator:
         return len(self.proxy_list)
 
 # Generate proxy from raw data (ip:port)
-class RawProxyGenerator:
+class RawProxyGetter:
     def __init__(self, length=10, max_ms=500, timeout=1, check_google=True, url="https://proxy-list.download/api/v1/get?type=https", methods=["https"]):
         self.length = length
         self.max_ms = max_ms
@@ -209,15 +209,15 @@ class RawProxyGenerator:
         # Convert to (ip:port) format
         for raw_proxy in raw_proxy_list:
             try:
-                # try:
-                proxy = {
-                    "ip_address": raw_proxy.split(':')[0],
-                    "port": int(raw_proxy.split(':')[1]),
-                }
-                # except:
-                #     status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Formatting Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
-                #     print(status, end='\r')
-                #     continue
+                try:
+                    proxy = {
+                        "ip_address": raw_proxy.split(':')[0],
+                        "port": int(raw_proxy.split(':')[1]),
+                    }
+                except:
+                    status = f"{proxy['ip_address']}:{proxy['port']} -> Failed (Formatting Error) - Valid proxies: {self.get_proxy_amount()}/{self.length}" + 10*" "
+                    print(status, end='\r')
+                    continue
                 
                 check = (False, None)
                 for method in self.methods:
@@ -279,7 +279,7 @@ class RawProxyGenerator:
 
 
 def generate_proxies_table(url, methods, amount):
-    proxy_list = ProxyGenerator(amount,
+    proxy_list = TabProxyGetter(amount,
         max_ms=conf['max_ms'],
         timeout=conf['timeout'],
         check_google=conf['check_google'],
@@ -290,7 +290,7 @@ def generate_proxies_table(url, methods, amount):
     return proxy_list.get_proxy_list() # return generated proxies
 
 def generate_proxies_raw(url, methods, amount):
-    proxy_list = RawProxyGenerator(amount,
+    proxy_list = RawProxyGetter(amount,
         max_ms=conf['max_ms'],
         timeout=conf['timeout'],
         check_google=conf['check_google'],
