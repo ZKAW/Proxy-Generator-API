@@ -5,12 +5,12 @@
         "content_type":"table"
     },
     {
-        "url":"https://www.proxy-list.download/api/v1/get?type=https&anon=elite",
+        "url":"https://proxy-list.download/api/v1/get?type=https&anon=elite",
         "method":"https",
         "content_type":"raw"
     },
     {
-        "url":"https://www.proxy-list.download/api/v1/get?type=https&anon=anonymous",
+        "url":"https://proxy-list.download/api/v1/get?type=https&anon=anonymous",
         "method":"https",
         "content_type":"raw"
     },

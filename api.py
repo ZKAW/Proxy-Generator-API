@@ -75,24 +75,39 @@ class ProxyThreading(object):
         for proxy in unchecked_proxy_list:
             # Check if proxy is working
             check = checker.check_proxy(proxy, timeout=config['timeout'], check_google=config['check_google'])
-            if (not check[0]): 
-                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+            if (not check[0]):
+                # Remove proxy if already in list
+                proxy_check = checker.check_duplicate(self.proxy_list, proxy)
+                if (proxy_check):
+                    self.proxy_list.remove(proxy_check)
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                else:
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+
                 print(status, end='\r')
                 continue
 
             ms = check[1]
             # Check if response time is too slow
             if (ms > config['max_ms']): 
-                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed (had {ms}ms but max is {self.max_ms}ms) - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                # Remove proxy if already in list
+                proxy_check = checker.check_duplicate(self.proxy_list, proxy)
+                if (proxy_check):
+                    self.proxy_list.remove(proxy_check)
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                else:
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+
                 print(status, end='\r')
                 continue
 
             # Check if proxy is already in proxy list
-            if (checker.check_duplicate(self.proxy_list, proxy)):
+            proxy_check = checker.check_duplicate(self.proxy_list, proxy)
+            if (proxy_check):
                 # Update proxy data if proxy is already in list
-                self.proxy_list[self.proxy_list.index(proxy)]['ms'] = ms
-                self.proxy_list[self.proxy_list.index(proxy)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                self.proxy_list[self.proxy_list.index(proxy)]['check_google'] = config['check_google']
+                self.proxy_list[self.proxy_list.index(proxy_check)]['ms'] = ms
+                self.proxy_list[self.proxy_list.index(proxy_check)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self.proxy_list[self.proxy_list.index(proxy_check)]['check_google'] = config['check_google']
                 status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Updated - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
                 print(status, end='\n')
                 continue
@@ -109,7 +124,7 @@ class ProxyThreading(object):
             new_proxies_counter += 1
 
             # We have enough proxies
-            if (self.get_proxy_amount() >= config['max_proxy']): break
+            if (self.get_proxy_amount() >= config['amount']): break
 
         return (self.proxy_list, new_proxies_counter)
 
@@ -151,17 +166,28 @@ class ProxyThreading(object):
         self.proxy_list = []
 
         return True
+    
+    def convert_seconds_to_time_str(self, seconds):
+        seconds = int(seconds)
+        if (seconds < 1): return '0s'
+
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = (seconds % 3600) % 60
+
+        hours_str = str(hours) + "h " if hours > 0 else ""
+        minutes_str = str(minutes) + "m " if minutes > 0 else ""
+        seconds_str = str(seconds) + "s" if seconds > 0 else ""
+
+        time_str = hours_str + minutes_str + seconds_str
+        return time_str.rstrip()
 
     def run(self):
         """ Method that runs forever """
         
-        self.remove_dead_proxy()
-        if (self.get_proxy_amount() > 0): print(f"Proxy list loaded: {self.get_proxy_amount()} working proxies found")
+        if (self.get_proxy_amount() > 0): print(f"Loaded {self.get_proxy_amount()} proxies from previous session")
 
         while True:
-            # Remove dead proxies
-            self.remove_dead_proxy()
-
             if (self.get_proxy_amount() >= config['amount']): # already have enough proxies
                 print(f"\nProxy list is full, {self.get_proxy_amount()}/{config['amount']} proxies")
             else:
@@ -177,8 +203,9 @@ class ProxyThreading(object):
             # Save proxy list for next session
             if (self.read_proxy_file() != self.proxy_list): self.save_proxy_list()
 
-            print("Waiting {} seconds before next generation...".format(self.interval))
-            time.sleep(self.interval)
+            if (self.interval > 0):
+                print(f"Waiting {self.convert_seconds_to_time_str(self.interval)} before next generation")
+                time.sleep(self.interval)
     
     def get_proxy_list(self):
         return self.proxy_list
@@ -186,7 +213,7 @@ class ProxyThreading(object):
     def get_proxy_amount(self):
         return len(self.proxy_list)
 
-proxyList = ProxyThreading(interval=config['interval'])
+proxyList = ProxyThreading(interval=config['fetch_interval'])
 
 @app.get('/')
 def help_page():
