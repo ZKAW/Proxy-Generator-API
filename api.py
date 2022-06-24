@@ -188,12 +188,18 @@ class ProxyThreading(object):
         if (self.get_proxy_amount() > 0): print(f"Loaded {self.get_proxy_amount()} proxies from previous session")
 
         while True:
+            # Check proxy list validity (if not empty)
+            if (len(self.proxy_list) > 0): self.check_proxy_list(self.proxy_list)
+
+            # Check if we have enough proxies
             if (self.get_proxy_amount() >= config['amount']): # already have enough proxies
                 print(f"\nProxy list is full, {self.get_proxy_amount()}/{config['amount']} proxies")
             else:
+                # Generate more proxies
                 unchecked_proxy_list = generator.main()
                 unchecked_proxy_list = self.proxy_list + unchecked_proxy_list
 
+                # Check new proxy list
                 print(f"-> {len(unchecked_proxy_list)} proxies to check\n")
                 new_proxies_counter = self.check_proxy_list(unchecked_proxy_list)[1]
 
@@ -203,6 +209,7 @@ class ProxyThreading(object):
             # Save proxy list for next session
             if (self.read_proxy_file() != self.proxy_list): self.save_proxy_list()
 
+            # Wait before next check
             if (self.interval > 0):
                 print(f"Waiting {self.convert_seconds_to_time_str(self.interval)} before next generation")
                 time.sleep(self.interval)
