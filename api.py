@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import threading
 import datetime
@@ -23,6 +24,26 @@ workspace = os.path.dirname(os.path.realpath(__file__))
 # Load config
 config = config.load_config()
 
+# better print end='\r'
+class OverwriteLast:
+    """
+    Avoid trailing characters on new line after same line print
+    """
+    def __init__(self):
+        self.last_len = 0
+    def print(self, content, end='\r'):
+
+        if len(content) < self.last_len:
+            print(content + ' '*(self.last_len-len(content)), end=end)
+        else:
+            print(content, end=end)
+
+        self.last_len = len(content)
+
+
+one_line = OverwriteLast()
+print_r = one_line.print
+
 class ProxyThreading(object):
     """ Threading example class
     The run() method will be started and it will run in the background
@@ -34,6 +55,7 @@ class ProxyThreading(object):
         :type interval: int
         :param interval: Check interval, in seconds
         """
+        self.paused = False
         self.interval = interval
         self.proxy_list = self.read_proxy_file() # get previous session proxy list
 
@@ -71,34 +93,37 @@ class ProxyThreading(object):
     def check_proxy_list(self, unchecked_proxy_list):
         if len(unchecked_proxy_list) == 0: return []
         new_proxies_counter = 0
+        tested_proxies_counter = 0
 
         for proxy in unchecked_proxy_list:
-            # Check if proxy is working
+            tested_proxies_counter += 1
+
+            """ Check if proxy is working """
             check = checker.check_proxy(proxy, timeout=config['timeout'], check_google=config['check_google'])
             if (not check[0]):
                 # Remove proxy if already in list
                 proxy_check = checker.check_duplicate(self.proxy_list, proxy)
                 if (proxy_check):
                     self.proxy_list.remove(proxy_check)
-                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)"
                 else:
-                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)"
 
-                print(status, end='\r')
+                print_r(status)
                 continue
 
+            """ Check if response time is too slow """
             ms = check[1]
-            # Check if response time is too slow
             if (ms > config['max_ms']): 
                 # Remove proxy if already in list
                 proxy_check = checker.check_duplicate(self.proxy_list, proxy)
                 if (proxy_check):
                     self.proxy_list.remove(proxy_check)
-                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Removed - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)"
                 else:
-                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
+                    status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Failed - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)"
 
-                print(status, end='\r')
+                print_r(status)
                 continue
 
             # Check if proxy is already in proxy list
@@ -108,8 +133,8 @@ class ProxyThreading(object):
                 self.proxy_list[self.proxy_list.index(proxy_check)]['ms'] = ms
                 self.proxy_list[self.proxy_list.index(proxy_check)]['last_check'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self.proxy_list[self.proxy_list.index(proxy_check)]['check_google'] = config['check_google']
-                status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Updated - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
-                print(status, end='\n')
+
+                print_r(f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Updated - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)", end='\n')
                 continue
 
             # Update proxy values
@@ -119,9 +144,9 @@ class ProxyThreading(object):
             
             # Add new proxy to proxy list
             self.proxy_list.append(proxy)
-            status = f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Added - Valid proxies: {self.get_proxy_amount()}/{config['amount']}" + 10*" "
-            print(status, end='\n')
             new_proxies_counter += 1
+    
+            print_r(f"{proxy['ip_address']}:{proxy['port']} ({proxy['method']}) -> Added - Valid proxies: {self.get_proxy_amount()}/{config['amount']} ({len(unchecked_proxy_list) - tested_proxies_counter} remaining)", end='\n')
 
             # We have enough proxies
             if (self.get_proxy_amount() >= config['amount']): break
@@ -203,16 +228,21 @@ class ProxyThreading(object):
                 print(f"-> {len(unchecked_proxy_list)} proxies to check\n")
                 new_proxies_counter = self.check_proxy_list(unchecked_proxy_list)[1]
 
-                print(f"Found {new_proxies_counter} new working proxies")
-                print(f"Currently have {self.get_proxy_amount()}/{config['amount']} working proxies\n")
+                print(f"\n\nFound {new_proxies_counter} new working proxies" + 10*' ')
+                print(f"Total valid proxies: {self.get_proxy_amount()}/{config['amount']}\n")
 
             # Save proxy list for next session
             if (self.read_proxy_file() != self.proxy_list): self.save_proxy_list()
 
             # Wait before next check
             if (self.interval > 0):
-                print(f"Waiting {self.convert_seconds_to_time_str(self.interval)} before next generation")
-                time.sleep(self.interval)
+                n = 0
+                self.paused = True
+                while (n < self.interval) and self.paused:
+                    time.sleep(1)
+                    n += 1
+                    print(f"Waiting {self.convert_seconds_to_time_str(self.interval - n)} before next generation", end='\r')
+                self.paused = False
     
     def get_proxy_list(self):
         return self.proxy_list
@@ -229,7 +259,10 @@ def help_page():
     <p>
         <a href="/api/proxy_list" target="_blank">/api/proxy_list</a> - Get proxy list<br>
         <a href="/api/proxy_amount" target="_blank">/api/proxy_amount</a> - Get proxy amount<br>
-        <a href="/api/proxy_delete" target="_blank">/api/proxy_delete</a> - Delete proxy list<br>
+        <a href="/api/proxy_update" target="_blank">/api/proxy_update</a> - Update proxy list<br>
+
+        <br>
+        <a href="/api/proxy_delete" target="_blank">/api/proxy_delete</a> - Delete proxy list
     </p>
     """
 
@@ -245,12 +278,18 @@ def get_proxy_list():
 
 @app.get('/api/proxy_amount')
 def get_proxy_amount():
-    return proxyList.get_proxy_amount()
+    amount = proxyList.get_proxy_amount()
+    return { 'amount': amount }
+
+@app.get('/api/proxy_update')
+def update_proxy_list():
+    proxyList.paused = False
+    return { 'success': True }
 
 @app.get('/api/proxy_delete')
 def delete_proxy_list():
     proxyList.delete_proxy_list()
-    return { 'status': 'success' }
+    return { 'success': True }
 
 def run_api():
     asyncio.set_event_loop(asyncio.new_event_loop())
