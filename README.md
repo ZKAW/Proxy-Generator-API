@@ -1,9 +1,9 @@
 # Proxy-Generator 
 
-### Description
+## Description
 Proxy list generator with validity check and web API.
 
-### Setup
+## Setup
 ```bash 
 git clone https://github.com/ZKAW/Proxy-Generator-API && cd Proxy-Generator-API
 ```
@@ -11,7 +11,7 @@ git clone https://github.com/ZKAW/Proxy-Generator-API && cd Proxy-Generator-API
 pip3 install -r requirements.txt
 ```
 
-### Usage
+## Usage
 ```bash
 python3 api.py
 ```
