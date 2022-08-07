@@ -1,7 +1,7 @@
 # Proxy-Generator 
 
 ### Description
-Generator of proxy list with validity and ms verification
+Proxy list generator with validity check and web API.
 
 ### Setup
 ```bash
