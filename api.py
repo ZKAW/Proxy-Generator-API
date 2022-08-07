@@ -10,7 +10,6 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from helpers import config
 from helpers import checker
 from workers import generator
 
@@ -22,10 +21,12 @@ app = FastAPI()
 workspace = os.path.dirname(os.path.realpath(__file__))
 
 # Load config
-config = config.load_config()
+with open(os.path.join(workspace,"config.json"), 'r') as json_data:
+    config = json.load(json_data)
+
 
 # better print end='\r'
-class OverwriteLast:
+class OneLinePrint:
     """
     Avoid trailing characters on new line after same line print
     """
@@ -41,7 +42,7 @@ class OverwriteLast:
         self.last_len = len(content)
 
 
-one_line = OverwriteLast()
+one_line = OneLinePrint()
 print_r = one_line.print
 
 class ProxyThreading(object):
