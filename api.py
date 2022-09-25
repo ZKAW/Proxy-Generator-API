@@ -256,7 +256,7 @@ proxyList = ProxyThreading(interval=config['fetch_interval'])
 @app.get('/')
 def help_page():
     html_content = """
-    <h1>Proxy Checker</h1>
+    <h1>Proxy Generator</h1>
     <p>
         <a href="/api/proxy_list" target="_blank">/api/proxy_list</a> - Get proxy list<br>
         <a href="/api/proxy_amount" target="_blank">/api/proxy_amount</a> - Get proxy amount<br>
